@@ -121,8 +121,9 @@ export default function Inversores() {
         {investors.map((inv) => {
           const share = Number(inv.investment_amount) / totalInvested
           const cashReturn = investorPool * share
-          const totalReturn = cashReturn + Number(inv.investment_amount)
+          const totalDue = Number(inv.investment_amount) + cashReturn
           const isSpecial = inv.is_special
+          const pendingCash = isSpecial ? totalDue - totalPabloW : totalDue
 
           return (
             <div
@@ -146,18 +147,25 @@ export default function Inversores() {
 
               <div className="space-y-2">
                 <Row label="Inversión" value={formatARS(inv.investment_amount)} />
-                <Row label="Ganancia a recibir (efectivo)" value={formatARS(cashReturn)} highlight={cashReturn > 0} />
+                <Row label="Ganancia a recibir" value={formatARS(cashReturn)} highlight={cashReturn > 0} />
                 {isSpecial && totalPabloW > 0 && (
-                  <Row
-                    label={`Bienes recibidos al costo (${pabloQty} uds.)`}
-                    value={formatARS(totalPabloW)}
-                    badge="Al costo"
-                  />
+                  <>
+                    <Row
+                      label={`Bienes ya recibidos al costo (${pabloQty} uds.)`}
+                      value={`− ${formatARS(totalPabloW)}`}
+                      badge="Ya recibido"
+                    />
+                    <Row
+                      label="Efectivo pendiente a recibir"
+                      value={formatARS(pendingCash)}
+                      highlight={pendingCash > 0}
+                    />
+                  </>
                 )}
                 <div className="border-t border-gray-100 pt-2 mt-2">
                   <Row
-                    label="Total a recuperar"
-                    value={formatARS(totalReturn + (isSpecial ? totalPabloW : 0))}
+                    label={isSpecial && totalPabloW > 0 ? 'Total a recuperar (bienes + efectivo)' : 'Total a recuperar'}
+                    value={formatARS(totalDue)}
                     bold
                   />
                 </div>

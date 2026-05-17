@@ -42,6 +42,8 @@ export default function Estadisticas() {
       const purchaseStickers = purchases.filter((r) => r.product_type === 'stickers')
       const saleAlbums = sales.filter((r) => r.product_type === 'album')
       const saleStickers = sales.filter((r) => r.product_type === 'stickers')
+      const pabloAlbums = pabloW.filter((r) => r.product_type === 'album')
+      const pabloStickers = pabloW.filter((r) => r.product_type === 'stickers')
 
       const totalPurchased = sum(purchases)
       const totalSold = sum(sales)
@@ -53,6 +55,8 @@ export default function Estadisticas() {
         purchaseStickers: { qty: sumQty(purchaseStickers), total: sum(purchaseStickers) },
         saleAlbums: { qty: sumQty(saleAlbums), total: sum(saleAlbums) },
         saleStickers: { qty: sumQty(saleStickers), total: sum(saleStickers) },
+        stockAlbums: sumQty(purchaseAlbums) - sumQty(saleAlbums) - sumQty(pabloAlbums),
+        stockStickers: sumQty(purchaseStickers) - sumQty(saleStickers) - sumQty(pabloStickers),
         totalPurchased,
         totalSold,
         totalPabloW,
@@ -120,6 +124,25 @@ export default function Estadisticas() {
             label="Total ventas"
             value={formatARS(data.totalSold)}
             sub="Ingresos totales por ventas"
+          />
+        </div>
+      </section>
+
+      {/* Stock disponible */}
+      <section>
+        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Stock disponible</h3>
+        <div className="space-y-2">
+          <StatCard
+            color={data.stockAlbums > 0 ? 'gray' : 'red'}
+            label="📔 Álbumes disponibles"
+            value={`${data.stockAlbums} unidades`}
+            sub="Comprados − vendidos − retirados por Pablo"
+          />
+          <StatCard
+            color={data.stockStickers > 0 ? 'gray' : 'red'}
+            label="🃏 Figuritas disponibles"
+            value={`${data.stockStickers} paquetes`}
+            sub="Comprados − vendidos − retirados por Pablo"
           />
         </div>
       </section>
