@@ -50,6 +50,28 @@ export default function Estadisticas() {
       const totalPabloW = sum(pabloW)
       const profit = totalSold - totalPurchased
 
+      // Desglose de ventas por día
+      const salesByDay = {}
+      for (const row of sales) {
+        const date = new Date(row.created_at).toLocaleDateString('es-AR', {
+          day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires'
+        })
+        if (!salesByDay[date]) salesByDay[date] = { albums: 0, stickers: 0, totalAlbums: 0, totalStickers: 0 }
+        if (row.product_type === 'album') {
+          salesByDay[date].albums += Number(row.quantity)
+          salesByDay[date].totalAlbums += Number(row.total_price)
+        } else {
+          salesByDay[date].stickers += Number(row.quantity)
+          salesByDay[date].totalStickers += Number(row.total_price)
+        }
+      }
+      const salesByDayArray = Object.entries(salesByDay)
+        .map(([date, v]) => ({ date, ...v, total: v.totalAlbums + v.totalStickers }))
+        .sort((a, b) => {
+          const parse = (d) => d.split('/').reverse().join('-')
+          return parse(a.date).localeCompare(parse(b.date))
+        })
+
       setData({
         purchaseAlbums: { qty: sumQty(purchaseAlbums), total: sum(purchaseAlbums) },
         purchaseStickers: { qty: sumQty(purchaseStickers), total: sum(purchaseStickers) },
@@ -62,6 +84,7 @@ export default function Estadisticas() {
         totalPabloW,
         pabloQty: sumQty(pabloW),
         profit,
+        salesByDay: salesByDayArray,
       })
       setLoading(false)
     }
@@ -127,6 +150,38 @@ export default function Estadisticas() {
           />
         </div>
       </section>
+
+      {/* Ventas por día */}
+      {data.salesByDay.length > 0 && (
+        <section>
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Ventas por día</h3>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {data.salesByDay.map((day, i) => (
+              <div
+                key={day.date}
+                className={`px-4 py-3 ${i < data.salesByDay.length - 1 ? 'border-b border-gray-100' : ''}`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-bold text-gray-800">📅 {day.date}</span>
+                  <span className="text-sm font-bold text-green-700">{formatARS(day.total)}</span>
+                </div>
+                <div className="flex gap-4">
+                  {day.stickers > 0 && (
+                    <span className="text-xs text-gray-500">
+                      🃏 <span className="font-semibold text-gray-700">{day.stickers}</span> paq · {formatARS(day.totalStickers)}
+                    </span>
+                  )}
+                  {day.albums > 0 && (
+                    <span className="text-xs text-gray-500">
+                      📔 <span className="font-semibold text-gray-700">{day.albums}</span> álb · {formatARS(day.totalAlbums)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Stock disponible */}
       <section>
