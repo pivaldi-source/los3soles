@@ -11,74 +11,77 @@ export default function Inversores() {
   const [financials, setFinancials] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Pablo withdrawal form
-  const [showForm, setShowForm] = useState(false)
+  // Formulario de retiro: guarda el investor_id del que está registrando, o null si está cerrado
+  const [showFormFor, setShowFormFor] = useState(null)
   const [productType, setProductType] = useState('stickers')
   const [quantity, setQuantity] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
   const [saving, setSaving] = useState(false)
-  const [formSuccess, setFormSuccess] = useState(false)
+  const [formSuccess, setFormSuccess] = useState(null) // investor_id del último éxito
 
   const withdrawalTotal = quantity && unitPrice ? Number(quantity) * Number(unitPrice) : 0
 
   async function load() {
-    const [invRows, txRows] = await Promise.all([
-      getInvestors(),
-      getTransactions(),
-    ])
-
+    const [invRows, txRows] = await Promise.all([getInvestors(), getTransactions()])
     if (!invRows || !txRows) return
 
     const purchases = txRows.filter((r) => r.type === 'purchase')
     const sales = txRows.filter((r) => r.type === 'sale')
-    const pabloW = txRows.filter((r) => r.type === 'pablo_withdrawal')
+    const withdrawals = txRows.filter((r) => r.type === 'withdrawal')
 
     const sum = (arr) => arr.reduce((acc, r) => acc + Number(r.total_price), 0)
     const sumQty = (arr) => arr.reduce((acc, r) => acc + Number(r.quantity), 0)
 
-    const totalPurchased = sum(purchases)
-    const totalSold = sum(sales)
-    const totalPabloW = sum(pabloW)
     const totalInvested = invRows.reduce((acc, i) => acc + Number(i.investment_amount), 0)
-
-    const grossProfit = totalSold - totalPurchased
+    const grossProfit = sum(sales) - sum(purchases)
     const investorPool = grossProfit > 0 ? grossProfit * 0.5 : 0
     const businessPool = grossProfit > 0 ? grossProfit * 0.5 : 0
 
+    // Retiros agrupados por inversor
+    const withdrawalsByInvestor = {}
+    for (const w of withdrawals) {
+      if (!w.investor_id) continue
+      if (!withdrawalsByInvestor[w.investor_id]) {
+        withdrawalsByInvestor[w.investor_id] = { total: 0, qty: 0 }
+      }
+      withdrawalsByInvestor[w.investor_id].total += Number(w.total_price)
+      withdrawalsByInvestor[w.investor_id].qty += Number(w.quantity)
+    }
+
     setInvestors(invRows)
-    setFinancials({
-      totalPurchased,
-      totalSold,
-      totalPabloW,
-      pabloQty: sumQty(pabloW),
-      grossProfit,
-      investorPool,
-      businessPool,
-      totalInvested,
-    })
+    setFinancials({ grossProfit, investorPool, businessPool, totalInvested, withdrawalsByInvestor })
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
-  async function handleWithdrawal(e) {
+  function openForm(investorId) {
+    setShowFormFor(investorId)
+    setFormSuccess(null)
+    setProductType('stickers')
+    setQuantity('')
+    setUnitPrice('')
+  }
+
+  async function handleWithdrawal(e, investorId) {
     e.preventDefault()
     setSaving(true)
     try {
       await createTransaction({
-        type: 'pablo_withdrawal',
+        type: 'withdrawal',
+        investor_id: investorId,
         product_type: productType,
         quantity: Number(quantity),
         unit_price: Number(unitPrice),
         total_price: withdrawalTotal,
       })
-      setFormSuccess(true)
+      setFormSuccess(investorId)
+      setShowFormFor(null)
       setQuantity('')
       setUnitPrice('')
-      setShowForm(false)
       await load()
     } catch {
-      // error silencioso por ahora
+      // silencioso
     } finally {
       setSaving(false)
     }
@@ -87,7 +90,7 @@ export default function Inversores() {
   if (loading) return <p className="text-center text-gray-400 mt-10">Cargando...</p>
   if (!financials) return null
 
-  const { grossProfit, investorPool, businessPool, totalInvested, totalPabloW, pabloQty } = financials
+  const { grossProfit, investorPool, businessPool, totalInvested, withdrawalsByInvestor } = financials
 
   return (
     <div className="space-y-6">
@@ -126,13 +129,16 @@ export default function Inversores() {
           const cashReturn = investorPool * share
           const totalDue = Number(inv.investment_amount) + cashReturn
           const isSpecial = inv.is_special
-          const pendingCash = isSpecial ? totalDue - totalPabloW : totalDue
+          const myWithdrawals = withdrawalsByInvestor[inv.id] ?? { total: 0, qty: 0 }
+          const pendingCash = totalDue - myWithdrawals.total
+          const isFormOpen = showFormFor === inv.id
 
           return (
             <div
               key={inv.id}
               className={`bg-white rounded-2xl p-5 shadow-sm border ${isSpecial ? 'border-orange-200' : 'border-gray-100'}`}
             >
+              {/* Encabezado */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{isSpecial ? '⭐' : '👤'}</span>
@@ -148,14 +154,16 @@ export default function Inversores() {
                 <span className="text-sm font-semibold text-gray-500">{pct(share)} del pool</span>
               </div>
 
+              {/* Filas financieras */}
               <div className="space-y-2">
                 <Row label="Inversión" value={formatARS(inv.investment_amount)} />
                 <Row label="Ganancia a recibir" value={formatARS(cashReturn)} highlight={cashReturn > 0} />
-                {isSpecial && totalPabloW > 0 && (
+
+                {isSpecial && myWithdrawals.total > 0 && (
                   <>
                     <Row
-                      label={`Bienes ya recibidos al costo (${pabloQty} uds.)`}
-                      value={`− ${formatARS(totalPabloW)}`}
+                      label={`Bienes ya recibidos al costo (${myWithdrawals.qty} uds.)`}
+                      value={`− ${formatARS(myWithdrawals.total)}`}
                       badge="Ya recibido"
                     />
                     <Row
@@ -165,102 +173,103 @@ export default function Inversores() {
                     />
                   </>
                 )}
+
                 <div className="border-t border-gray-100 pt-2 mt-2">
                   <Row
-                    label={isSpecial && totalPabloW > 0 ? 'Total a recuperar (bienes + efectivo)' : 'Total a recuperar'}
+                    label={isSpecial && myWithdrawals.total > 0 ? 'Total a recuperar (bienes + efectivo)' : 'Total a recuperar'}
                     value={formatARS(totalDue)}
                     bold
                   />
                 </div>
               </div>
+
+              {/* Formulario de retiro al costo — solo inversores especiales */}
+              {isSpecial && (
+                <div className="mt-4">
+                  {formSuccess === inv.id && (
+                    <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 mb-3">
+                      <p className="text-green-700 font-medium text-sm">✓ Retiro registrado</p>
+                    </div>
+                  )}
+
+                  {!isFormOpen ? (
+                    <button
+                      onClick={() => openForm(inv.id)}
+                      className="w-full text-sm text-orange-600 font-semibold border border-orange-200 rounded-xl py-2 hover:bg-orange-50 transition-colors"
+                    >
+                      + Registrar retiro al costo
+                    </button>
+                  ) : (
+                    <form onSubmit={(e) => handleWithdrawal(e, inv.id)} className="space-y-3 border-t border-orange-100 pt-4 mt-2">
+                      <p className="text-sm font-semibold text-orange-700">Nuevo retiro al costo</p>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: 'stickers', label: '🃏 Figuritas' },
+                          { value: 'album', label: '📔 Álbum' },
+                        ].map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setProductType(opt.value)}
+                            className={`py-2 px-3 rounded-xl border-2 text-sm font-semibold transition-colors ${
+                              productType === opt.value ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-gray-50'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        placeholder="Cantidad"
+                        required
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        value={unitPrice}
+                        onChange={(e) => setUnitPrice(e.target.value)}
+                        placeholder="Precio costo por unidad (ARS)"
+                        required
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+
+                      {withdrawalTotal > 0 && (
+                        <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
+                          <p className="text-xs text-orange-600 font-medium">Total al costo</p>
+                          <p className="text-xl font-bold text-orange-800">{formatARS(withdrawalTotal)}</p>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowFormFor(null)}
+                          className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="flex-1 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold disabled:opacity-50 transition-colors"
+                        >
+                          {saving ? 'Guardando...' : 'Registrar'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}
-      </section>
-
-      {/* Retiro de Pablo */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide">Retiro de Pablo al costo</h3>
-          <button
-            onClick={() => { setShowForm(!showForm); setFormSuccess(false) }}
-            className="text-sm text-orange-600 font-semibold"
-          >
-            {showForm ? 'Cancelar' : '+ Registrar retiro'}
-          </button>
-        </div>
-
-        {formSuccess && (
-          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-3">
-            <p className="text-green-700 font-medium text-sm">✓ Retiro registrado</p>
-          </div>
-        )}
-
-        {showForm && (
-          <form onSubmit={handleWithdrawal} className="bg-white rounded-2xl p-5 shadow-sm border border-orange-200 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de producto</label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { value: 'stickers', label: '🃏 Figuritas' },
-                  { value: 'album', label: '📔 Álbum' },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setProductType(opt.value)}
-                    className={`py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-colors ${
-                      productType === opt.value ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-gray-50'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Cantidad</label>
-              <input
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="Ej: 10"
-                required
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Precio costo por unidad (ARS)</label>
-              <input
-                type="number"
-                min="1"
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(e.target.value)}
-                placeholder="Ej: 5000"
-                required
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
-              />
-            </div>
-
-            {withdrawalTotal > 0 && (
-              <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
-                <p className="text-xs text-orange-600 font-medium">Total al costo</p>
-                <p className="text-2xl font-bold text-orange-800">{formatARS(withdrawalTotal)}</p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-xl text-lg disabled:opacity-50 transition-colors"
-            >
-              {saving ? 'Guardando...' : 'Registrar Retiro'}
-            </button>
-          </form>
-        )}
       </section>
     </div>
   )

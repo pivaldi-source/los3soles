@@ -9,10 +9,10 @@ export default async (req) => {
   }
 
   if (req.method === 'POST') {
-    const { type, product_type, quantity, unit_price, total_price, notes } = await req.json()
+    const { type, product_type, quantity, unit_price, total_price, notes, investor_id } = await req.json()
     const [row] = await sql`
-      INSERT INTO transactions (type, product_type, quantity, unit_price, total_price, notes)
-      VALUES (${type}, ${product_type}, ${quantity}, ${unit_price}, ${total_price}, ${notes ?? null})
+      INSERT INTO transactions (type, product_type, quantity, unit_price, total_price, notes, investor_id)
+      VALUES (${type}, ${product_type}, ${quantity}, ${unit_price}, ${total_price}, ${notes ?? null}, ${investor_id ?? null})
       RETURNING *`
     return Response.json(row)
   }

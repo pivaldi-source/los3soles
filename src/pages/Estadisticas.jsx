@@ -33,7 +33,7 @@ export default function Estadisticas() {
 
       const purchases = rows.filter((r) => r.type === 'purchase')
       const sales = rows.filter((r) => r.type === 'sale')
-      const pabloW = rows.filter((r) => r.type === 'pablo_withdrawal')
+      const pabloW = rows.filter((r) => r.type === 'withdrawal')
 
       const sum = (arr) => arr.reduce((acc, r) => acc + Number(r.total_price), 0)
       const sumQty = (arr) => arr.reduce((acc, r) => acc + Number(r.quantity), 0)
@@ -191,24 +191,24 @@ export default function Estadisticas() {
             color={data.stockAlbums > 0 ? 'gray' : 'red'}
             label="📔 Álbumes disponibles"
             value={`${data.stockAlbums} unidades`}
-            sub="Comprados − vendidos − retirados por Pablo"
+            sub="Comprados − vendidos − retirados al costo"
           />
           <StatCard
             color={data.stockStickers > 0 ? 'gray' : 'red'}
             label="🃏 Figuritas disponibles"
             value={`${data.stockStickers} paquetes`}
-            sub="Comprados − vendidos − retirados por Pablo"
+            sub="Comprados − vendidos − retirados al costo"
           />
         </div>
       </section>
 
-      {/* Retiros Pablo */}
+      {/* Retiros al costo */}
       {data.totalPabloW > 0 && (
         <section>
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Retiros Pablo al costo</h3>
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Retiros al costo</h3>
           <StatCard
             color="orange"
-            label="Mercadería retirada al costo"
+            label="Mercadería retirada al costo (todos los inversores)"
             value={formatARS(data.totalPabloW)}
             sub={`${data.pabloQty} unidades`}
           />
