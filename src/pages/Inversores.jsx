@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { getTransactions, getInvestors, createTransaction } from '../lib/api'
 
 const formatARS = (n) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -22,9 +22,9 @@ export default function Inversores() {
   const withdrawalTotal = quantity && unitPrice ? Number(quantity) * Number(unitPrice) : 0
 
   async function load() {
-    const [{ data: invRows }, { data: txRows }] = await Promise.all([
-      supabase.from('investors').select('*').order('investment_amount', { ascending: false }),
-      supabase.from('transactions').select('*'),
+    const [invRows, txRows] = await Promise.all([
+      getInvestors(),
+      getTransactions(),
     ])
 
     if (!invRows || !txRows) return
@@ -64,20 +64,23 @@ export default function Inversores() {
   async function handleWithdrawal(e) {
     e.preventDefault()
     setSaving(true)
-    const { error } = await supabase.from('transactions').insert({
-      type: 'pablo_withdrawal',
-      product_type: productType,
-      quantity: Number(quantity),
-      unit_price: Number(unitPrice),
-      total_price: withdrawalTotal,
-    })
-    setSaving(false)
-    if (!error) {
+    try {
+      await createTransaction({
+        type: 'pablo_withdrawal',
+        product_type: productType,
+        quantity: Number(quantity),
+        unit_price: Number(unitPrice),
+        total_price: withdrawalTotal,
+      })
       setFormSuccess(true)
       setQuantity('')
       setUnitPrice('')
       setShowForm(false)
       await load()
+    } catch {
+      // error silencioso por ahora
+    } finally {
+      setSaving(false)
     }
   }
 

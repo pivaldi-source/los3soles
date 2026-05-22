@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { getTransactions } from '../lib/api'
 
 const formatARS = (n) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -28,7 +28,7 @@ export default function Estadisticas() {
 
   useEffect(() => {
     async function load() {
-      const { data: rows } = await supabase.from('transactions').select('*')
+      const rows = await getTransactions()
       if (!rows) return
 
       const purchases = rows.filter((r) => r.type === 'purchase')

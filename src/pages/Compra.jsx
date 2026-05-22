@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { createTransaction } from '../lib/api'
 
 const formatARS = (n) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -20,21 +20,21 @@ export default function Compra() {
     setError(null)
     setSuccess(false)
 
-    const { error: dbError } = await supabase.from('transactions').insert({
-      type: 'purchase',
-      product_type: productType,
-      quantity: Number(quantity),
-      unit_price: Number(unitPrice),
-      total_price: total,
-    })
-
-    setLoading(false)
-    if (dbError) {
-      setError('Error al guardar. Intentá de nuevo.')
-    } else {
+    try {
+      await createTransaction({
+        type: 'purchase',
+        product_type: productType,
+        quantity: Number(quantity),
+        unit_price: Number(unitPrice),
+        total_price: total,
+      })
       setSuccess(true)
       setQuantity('')
       setUnitPrice('')
+    } catch {
+      setError('Error al guardar. Intentá de nuevo.')
+    } finally {
+      setLoading(false)
     }
   }
 
