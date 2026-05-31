@@ -35,6 +35,7 @@ export default function Estadisticas() {
       const purchases = rows.filter((r) => r.type === 'purchase')
       const sales = rows.filter((r) => r.type === 'sale')
       const pabloW = rows.filter((r) => r.type === 'withdrawal')
+      const cashWithdrawals = rows.filter((r) => r.type === 'cash_withdrawal')
 
       const sum = (arr) => arr.reduce((acc, r) => acc + Number(r.total_price), 0)
       const sumQty = (arr) => arr.reduce((acc, r) => acc + Number(r.quantity), 0)
@@ -49,8 +50,9 @@ export default function Estadisticas() {
       const totalPurchased = sum(purchases)
       const totalSold = sum(sales)
       const totalPabloW = sum(pabloW)
+      const totalCashWithdrawals = sum(cashWithdrawals)
       const profit = totalSold - totalPurchased
-      const cajaDisponible = totalInvested + totalSold - totalPurchased
+      const cajaDisponible = totalInvested + totalSold - totalPurchased - totalCashWithdrawals
 
       // Desglose de ventas por día
       const salesByDay = {}
@@ -88,6 +90,7 @@ export default function Estadisticas() {
         profit,
         cajaDisponible,
         totalInvested,
+        totalCashWithdrawals,
         salesByDay: salesByDayArray,
       })
       setLoading(false)
@@ -262,6 +265,12 @@ export default function Estadisticas() {
             <span className="text-sm text-gray-500">Compras realizadas</span>
             <span className="text-sm font-semibold text-red-700">−{formatARS(data.totalPurchased)}</span>
           </div>
+          {data.totalCashWithdrawals > 0 && (
+            <div className="px-4 py-3 border-b border-gray-100 flex justify-between">
+              <span className="text-sm text-gray-500">Retiros en efectivo</span>
+              <span className="text-sm font-semibold text-red-700">−{formatARS(data.totalCashWithdrawals)}</span>
+            </div>
+          )}
           <div className={`px-4 py-4 flex justify-between items-center ${data.cajaDisponible >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
             <div>
               <p className={`text-sm font-bold ${data.cajaDisponible >= 0 ? 'text-green-800' : 'text-red-800'}`}>
