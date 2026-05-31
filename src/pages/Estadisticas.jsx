@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getTransactions } from '../lib/api'
+import { getTransactions, getInvestors } from '../lib/api'
 
 const formatARS = (n) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -28,8 +28,9 @@ export default function Estadisticas() {
 
   useEffect(() => {
     async function load() {
-      const rows = await getTransactions()
+      const [rows, investors] = await Promise.all([getTransactions(), getInvestors()])
       if (!rows) return
+      const totalInvested = (investors ?? []).reduce((acc, i) => acc + Number(i.investment_amount), 0)
 
       const purchases = rows.filter((r) => r.type === 'purchase')
       const sales = rows.filter((r) => r.type === 'sale')
@@ -49,6 +50,7 @@ export default function Estadisticas() {
       const totalSold = sum(sales)
       const totalPabloW = sum(pabloW)
       const profit = totalSold - totalPurchased
+      const cajaDisponible = totalInvested + totalSold - totalPurchased
 
       // Desglose de ventas por día
       const salesByDay = {}
@@ -84,6 +86,8 @@ export default function Estadisticas() {
         totalPabloW,
         pabloQty: sumQty(pabloW),
         profit,
+        cajaDisponible,
+        totalInvested,
         salesByDay: salesByDayArray,
       })
       setLoading(false)
@@ -238,6 +242,36 @@ export default function Estadisticas() {
             <p className="text-xs opacity-60 mt-0.5">
               {data.profit >= 0 ? 'El negocio está en ganancia' : 'Aún en zona de inversión'}
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Flujo de caja */}
+      <section>
+        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Flujo de caja</h3>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex justify-between">
+            <span className="text-sm text-gray-500">Capital inicial (inversores)</span>
+            <span className="text-sm font-semibold text-gray-700">+{formatARS(data.totalInvested)}</span>
+          </div>
+          <div className="px-4 py-3 border-b border-gray-100 flex justify-between">
+            <span className="text-sm text-gray-500">Ventas realizadas</span>
+            <span className="text-sm font-semibold text-green-700">+{formatARS(data.totalSold)}</span>
+          </div>
+          <div className="px-4 py-3 border-b border-gray-100 flex justify-between">
+            <span className="text-sm text-gray-500">Compras realizadas</span>
+            <span className="text-sm font-semibold text-red-700">−{formatARS(data.totalPurchased)}</span>
+          </div>
+          <div className={`px-4 py-4 flex justify-between items-center ${data.cajaDisponible >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+            <div>
+              <p className={`text-sm font-bold ${data.cajaDisponible >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                Caja disponible
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">Efectivo en mano ahora</p>
+            </div>
+            <span className={`text-xl font-bold ${data.cajaDisponible >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+              {formatARS(data.cajaDisponible)}
+            </span>
           </div>
         </div>
       </section>

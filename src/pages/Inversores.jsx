@@ -33,9 +33,12 @@ export default function Inversores() {
     const sumQty = (arr) => arr.reduce((acc, r) => acc + Number(r.quantity), 0)
 
     const totalInvested = invRows.reduce((acc, i) => acc + Number(i.investment_amount), 0)
-    const grossProfit = sum(sales) - sum(purchases)
+    const totalPurchased = sum(purchases)
+    const totalSold = sum(sales)
+    const grossProfit = totalSold - totalPurchased
     const investorPool = grossProfit > 0 ? grossProfit * 0.5 : 0
     const businessPool = grossProfit > 0 ? grossProfit * 0.5 : 0
+    const cajaDisponible = totalInvested + totalSold - totalPurchased
 
     // Retiros agrupados por inversor
     const withdrawalsByInvestor = {}
@@ -48,8 +51,19 @@ export default function Inversores() {
       withdrawalsByInvestor[w.investor_id].qty += Number(w.quantity)
     }
 
+    // Total owed en cash a todos los inversores (para calcular cobrable hoy proporcional)
+    const totalOwedInvestors = invRows.reduce((acc, inv) => {
+      const share = Number(inv.investment_amount) / totalInvested
+      const cashReturn = investorPool * share
+      const myWithd = withdrawalsByInvestor[inv.id]?.total ?? 0
+      return acc + Number(inv.investment_amount) + cashReturn - myWithd
+    }, 0)
+
+    // Caja disponible para pagar a inversores (el negocio retiene su pool de ganancia)
+    const cajaParaInversores = Math.max(0, Math.min(totalOwedInvestors, cajaDisponible - businessPool))
+
     setInvestors(invRows)
-    setFinancials({ grossProfit, investorPool, businessPool, totalInvested, withdrawalsByInvestor })
+    setFinancials({ grossProfit, investorPool, businessPool, totalInvested, withdrawalsByInvestor, cajaDisponible, totalOwedInvestors, cajaParaInversores })
     setLoading(false)
   }
 
@@ -90,7 +104,7 @@ export default function Inversores() {
   if (loading) return <p className="text-center text-gray-400 mt-10">Cargando...</p>
   if (!financials) return null
 
-  const { grossProfit, investorPool, businessPool, totalInvested, withdrawalsByInvestor } = financials
+  const { grossProfit, investorPool, businessPool, totalInvested, withdrawalsByInvestor, cajaDisponible, totalOwedInvestors, cajaParaInversores } = financials
 
   return (
     <div className="space-y-6">
@@ -114,6 +128,15 @@ export default function Inversores() {
             <p className="font-bold text-lg text-gray-800">{formatARS(businessPool)}</p>
           </div>
         </div>
+        <div className={`rounded-xl px-3 py-2 flex items-center justify-between ${cajaDisponible >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          <div>
+            <p className={`text-xs font-medium ${cajaDisponible >= 0 ? 'text-green-700' : 'text-red-700'}`}>💵 Caja disponible</p>
+            <p className="text-xs text-gray-500">Efectivo en mano ahora</p>
+          </div>
+          <p className={`font-bold text-lg ${cajaDisponible >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+            {formatARS(cajaDisponible)}
+          </p>
+        </div>
         {grossProfit <= 0 && (
           <p className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
             ⏳ Aún sin ganancia para distribuir. Las ganancias se calculan cuando las ventas superen las compras.
@@ -131,6 +154,9 @@ export default function Inversores() {
           const isSpecial = inv.is_special
           const myWithdrawals = withdrawalsByInvestor[inv.id] ?? { total: 0, qty: 0 }
           const pendingCash = totalDue - myWithdrawals.total
+          const cobrableHoy = totalOwedInvestors > 0
+            ? (pendingCash / totalOwedInvestors) * cajaParaInversores
+            : 0
           const isFormOpen = showFormFor === inv.id
 
           return (
@@ -180,6 +206,13 @@ export default function Inversores() {
                     value={formatARS(totalDue)}
                     bold
                   />
+                  <div className="mt-2 pt-2 border-t border-dashed border-gray-100">
+                    <Row
+                      label="💵 Cobrable hoy (según caja)"
+                      value={formatARS(cobrableHoy)}
+                      highlight={cobrableHoy > 0}
+                    />
+                  </div>
                 </div>
               </div>
 
