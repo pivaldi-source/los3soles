@@ -69,7 +69,7 @@ export default function Inversores() {
 
     // Total owed en cash a todos los inversores
     const totalOwedInvestors = invRows.reduce((acc, inv) => {
-      const share = Number(inv.investment_amount) / totalInvested
+      const share = 1 / invRows.length
       const cashReturn = investorPool * share
       const myWithd = withdrawalsByInvestor[inv.id]?.total ?? 0
       const myCashWithd = cashWithdrawalsByInvestor[inv.id]?.total ?? 0
@@ -195,7 +195,7 @@ export default function Inversores() {
       <section className="space-y-4">
         <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide">Detalle por inversor</h3>
         {investors.map((inv) => {
-          const share = Number(inv.investment_amount) / totalInvested
+          const share = 1 / investors.length
           const cashReturn = investorPool * share
           const totalDue = Number(inv.investment_amount) + cashReturn
           const isSpecial = inv.is_special
